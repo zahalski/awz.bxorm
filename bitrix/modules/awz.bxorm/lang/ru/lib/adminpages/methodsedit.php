@@ -1,0 +1,19 @@
+<?php
+$MESS['AWZ_BXORM_METHODS_EDIT_TITLE'] = 'Редактирование метода API';
+$MESS['AWZ_BXORM_METHODS_EDIT_EDIT1'] = 'Параметры метода API';
+$MESS['AWZ_BXORM_METHODS_EDIT_ERR1'] = 'Модули не подключены или не все модули установлены в системе';
+$MESS['AWZ_BXORM_METHODS_EDIT_ERR2'] = 'Нет поддержки данного типа поля';
+$MESS['AWZ_BXORM_METHODS_EDIT_ERR3'] = 'Класс не найден';
+$MESS['AWZ_BXORM_METHODS_EDIT_ERR4'] = 'Класс не является ORM сущностью';
+$MESS['AWZ_BXORM_METHODS_EDIT_PRM11'] = 'Параметры полей';
+$MESS['AWZ_BXORM_METHODS_EDIT_PRM11_1'] = 'Поле';
+$MESS['AWZ_BXORM_METHODS_EDIT_PRM11_2'] = 'Параметры';
+$MESS['AWZ_BXORM_METHODS_EDIT_PRM22'] = 'Доступные методы';
+$MESS['AWZ_BXORM_METHODS_EDIT_PRM22_1'] = 'Код';
+$MESS['AWZ_BXORM_METHODS_EDIT_PRM22_2'] = 'Название';
+$MESS['AWZ_BXORM_METHODS_EDIT_PRM22_3'] = 'Доступность';
+$MESS['AWZ_BXORM_METHODS_EDIT_ONLY_READ'] = 'только для чтения';
+$MESS['AWZ_BXORM_METHODS_EDIT_FIELDS_ACTIVE_PRM'] = 'активность поля';
+$MESS['AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE'] = 'тип';
+$MESS['AWZ_BXORM_METHODS_EDIT_IS_REQ'] = 'обязательное';
+$MESS['AWZ_BXORM_METHODS_EDIT_FIELDS_SORTABLE_PRM'] = 'разрешена сортировка';
