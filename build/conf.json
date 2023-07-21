@@ -6,6 +6,7 @@
   "readme_file": "../README.md",
   "lang_prefix": ["AWZ_BXORM_"],
   "disabled_lang": [
-    "AWZ_PARTNER_NAME", "AWZ_PARTNER_URI", "ACCESS_DENIED"
+    "AWZ_PARTNER_NAME", "AWZ_PARTNER_URI", "ACCESS_DENIED",
+	"AWZ_BXORM_HELPER_METHOD_"
   ]
 }
