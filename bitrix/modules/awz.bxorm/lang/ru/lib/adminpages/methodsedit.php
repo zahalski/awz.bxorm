@@ -17,3 +17,4 @@ $MESS['AWZ_BXORM_METHODS_EDIT_FIELDS_ACTIVE_PRM'] = 'активность пол
 $MESS['AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE'] = 'тип';
 $MESS['AWZ_BXORM_METHODS_EDIT_IS_REQ'] = 'обязательное';
 $MESS['AWZ_BXORM_METHODS_EDIT_FIELDS_SORTABLE_PRM'] = 'разрешена сортировка';
+$MESS['AWZ_BXORM_METHODS_BXAPI_MSG'] = 'Данный API может работать нестабильно (отключены все фильтры и обработчики запроса). Рекомендуется использовать контроллеры-наследники Awz\BxOrm\Api\Scopes\Controller';

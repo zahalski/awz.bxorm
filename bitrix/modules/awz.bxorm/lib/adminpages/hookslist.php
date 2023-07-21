@@ -6,6 +6,7 @@ use Bitrix\Main\Localization\Loc;
 use Awz\Admin\IList;
 use Awz\Admin\IParams;
 use Awz\Admin\Helper;
+use Bitrix\Main\Application;
 
 Loc::loadMessages(__FILE__);
 
@@ -22,6 +23,10 @@ class HooksList extends IList implements IParams {
         Helper::editListField($row, 'NAME', ['type'=>'string'], $this);
         Helper::editListField($row, 'ACTIVE', ['type'=>'checkbox'], $this);
 
+        $domain = Application::getInstance()->getContext()->getServer()->getHttpHost();
+        $baseApiUrl = 'https://'.$domain.'/bitrix/services/main/ajax.php?action=awz:bxorm.api.hook.call&app='.$row->arRes['ID'].'&key='.$row->arRes['TOKEN'].'&method=';
+        $baseApiUrl2 = 'https://'.$domain.'/bitrix/services/main/ajax.php?action=awz:bxorm.api.hook.methods&app='.$row->arRes['ID'].'&key='.$row->arRes['TOKEN'];
+
         $methods = [];
         if(!empty($row->arRes['METHODS'])){
             $methodsRes = \Awz\BxOrm\MethodsTable::getList([
@@ -31,14 +36,12 @@ class HooksList extends IList implements IParams {
             while($data = $methodsRes->fetch()){
                 foreach($data['PARAMS']['methods'] as $k=>$v){
                     if($v === 'Y')
-                        $methods[] = $data['CODE'].'.'.$k;
+                        $methods[] = '<a href="'.$baseApiUrl.$data['CODE'].'.'.$k.'" target="_blank">'.$data['CODE'].'.'.$k.'</a>';
                 }
             }
         }
 
-
-        $baseApiUrl = '/bitrix/services/main/ajax.php?action=awz:bxorm.api.hook.call&app='.$row->arRes['ID'].'&key='.$row->arRes['TOKEN'].'&method=';
-        $row->AddViewField('METHODS',$baseApiUrl.'<br>'.implode(', ',$methods));
+        $row->AddViewField('METHODS',Loc::getMessage('AWZ_BXORM_HOOKS_LIST_WEBHOOK').': <a target="_blank" href="'.$baseApiUrl.'">'.$baseApiUrl.'</a><br>'.Loc::getMessage('AWZ_BXORM_HOOKS_LIST_WEBHOOK_2').': <a target="_blank" href="'.$baseApiUrl2.'">'.$baseApiUrl2.'</a><br>'.implode(', ',$methods));
 
         ///bitrix/services/main/ajax.php?action=awz:bxorm.api.hook.call&app=1&key=k3ZaH73tSLx9I6us8C&method=
 

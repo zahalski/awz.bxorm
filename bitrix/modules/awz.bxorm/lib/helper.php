@@ -3,14 +3,21 @@
 namespace Awz\BxOrm;
 
 use Bitrix\Main\Application;
+use Bitrix\Main\Event;
+use Bitrix\Main\EventResult;
 use Bitrix\Main\IO\Directory;
 use Bitrix\Main\IO\File;
 use Bitrix\Main\Localization\Loc;
+use Bitrix\Main\Result;
 use Bitrix\Main\Security\Random;
+use Bitrix\Main\Config\Option;
 
 Loc::loadMessages(__FILE__);
 
 class Helper {
+
+    const CONTROLLER_TYPE_AWZ = 'awz';
+    const CONTROLLER_TYPE_BX = 'bitrix';
 
     public static function getMethodsList(){
         static $methodsList = [];
@@ -54,14 +61,50 @@ class Helper {
         return $moduleList;
     }
 
-    public static function getOrmMethods(\Bitrix\Main\ORM\Entity $entity){
-        $codes = [
-            'list','update','delete','add','fields',/*'batch',*/'get'
-        ];
+    public static function getMethods($entity){
         $methods = [];
-        foreach($codes as $code){
-            $lang = Loc::getMessage('AWZ_BXORM_HELPER_METHOD_'.mb_strtoupper($code));
-            $methods[$code] = $lang ?? $code;
+
+        $event = new Event(
+            "awz.bxorm",
+            "onBeforeGetMethods",
+            ['entity'=>$entity]
+        );
+        $event->send();
+        if ($event->getResults()) {
+            foreach ($event->getResults() as $evenResult) {
+                if ($evenResult->getType() == EventResult::SUCCESS) {
+                    $r = $evenResult->getParameters();
+                    if(isset($r['methods']) && is_array($r['methods'])){
+                        foreach($r['methods'] as $c=>$v){
+                            $methods[$c] = $v;
+                        }
+                    }
+                }
+            }
+        }
+
+        if(is_string($entity) && class_exists($entity) && method_exists($entity, 'addScopeApi')){
+            $controller = new $entity();
+            $actions = $controller->listNameActions();
+            foreach($actions as $code){
+                $methods[$code] = $code.'Action';
+            }
+        }elseif(is_string($entity) && class_exists($entity) && method_exists($entity, 'listNameActions')){
+            $controller = new $entity();
+            $actions = $controller->listNameActions();
+            foreach($actions as $code){
+                $methods[$code] = $code.'Action';
+            }
+        }
+
+        if($entity instanceof \Bitrix\Main\ORM\Entity){
+            $codes = [
+                'list','update','delete','add','fields','get'
+            ];
+            foreach($codes as $code){
+                $lang = Loc::getMessage('AWZ_BXORM_HELPER_METHOD_'.mb_strtoupper($code));
+                $methods[$code] = $lang ?? $code;
+            }
         }
         return $methods;
     }
@@ -69,7 +112,7 @@ class Helper {
     public static function generateToken(): string
     {
         $token = Random::getStringByAlphabet(
-            18,
+            (int) Option::get("awz.bxorm", 'token_len', 28, ""),
             Random::ALPHABET_NUM|Random::ALPHABET_ALPHALOWER|Random::ALPHABET_ALPHAUPPER,
             true
         );

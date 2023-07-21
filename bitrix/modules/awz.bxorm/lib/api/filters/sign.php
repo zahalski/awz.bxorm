@@ -4,6 +4,7 @@ namespace Awz\BxOrm\Api\Filters;
 
 use Awz\BxOrm\Api\Scopes\BaseFilter;
 use Awz\BxOrm\Api\Scopes\Scope;
+use Bitrix\Main\LoaderException;
 use Bitrix\Main\Localization\Loc;
 use Bitrix\Main\Security;
 use Bitrix\Main\Error;
@@ -45,7 +46,7 @@ class Sign extends BaseFilter {
             $params = unserialize(base64_decode($params), ['allowed_classes' => false]);
         }catch (\Exception $e){
             $this->addError(new Error(
-                'Ошибка проверки подписи',
+                Loc::getMessage('AWZ_BXORM_API_FILTER_SIGN_ERR'),
                 self::ERROR_INVALID_PARAMS
             ));
 
@@ -56,7 +57,7 @@ class Sign extends BaseFilter {
         if (empty($params))
         {
             $this->addError(new Error(
-                'Ошибка проверки подписи',
+                Loc::getMessage('AWZ_BXORM_API_FILTER_SIGN_ERR'),
                 self::ERROR_INVALID_PARAMS
             ));
 

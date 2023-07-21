@@ -4,6 +4,8 @@ namespace Awz\BxOrm\AdminPages;
 
 use Awz\Admin\Helper;
 use Awz\BxOrm\Helper as MainHelper;
+use Bitrix\Main\Event;
+use Bitrix\Main\EventResult;
 use Bitrix\Main\IO\Directory;
 use Bitrix\Main\Localization\Loc;
 use Awz\Admin\IForm;
@@ -191,9 +193,30 @@ class MethodsEdit extends IForm implements IParams {
         }
         ?>
         <?
-        $methods = MainHelper::getOrmMethods($entityCl::getEntity());
+        //\Bitrix\Main\Engine\Controller
+        $methods = [];
+        if($entity && is_string($entity) && class_exists($entity) && method_exists($entity, 'getEntity')){
+            $methods = MainHelper::getMethods($entityCl::getEntity());
+        }
+        $controllerType = '';
+        if($entity && is_string($entity) && class_exists($entity) && method_exists($entity, 'addScopeApi')){
+            $methods = MainHelper::getMethods($entity);
+            $controllerType = MainHelper::CONTROLLER_TYPE_AWZ;
+        }elseif($entity && is_string($entity) && class_exists($entity) && method_exists($entity, 'listNameActions')){
+            $methods = MainHelper::getMethods($entity);
+            $controllerType = MainHelper::CONTROLLER_TYPE_BX;
+        }
+        //var_dump(class_exists($entity));
+
         ?>
         <h2><?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_PRM22')?></h2>
+        <?if($controllerType === MainHelper::CONTROLLER_TYPE_BX){?>
+            <div class="adm-info-message-wrap">
+                <div class="adm-info-message">
+                    <div> <?=Loc::getMessage('AWZ_BXORM_METHODS_BXAPI_MSG')?></div>
+                </div>
+            </div>
+        <?}?>
         <table>
             <tr>
                 <th style="padding:5px;text-align:left;border-bottom:1px solid #87919c;border-right:1px solid #87919c;"><?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_PRM22_3')?></th>
@@ -212,91 +235,120 @@ class MethodsEdit extends IForm implements IParams {
                 </tr>
             <?}?>
         </table>
-        <h2><?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_PRM11')?></h2>
-        <table>
-        <tr>
-            <th style="padding:5px;text-align:left;border-bottom:1px solid #87919c;border-right:1px solid #87919c;"><?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_PRM11_1')?></th>
-            <th style="padding:5px;text-align:left;border-bottom:1px solid #87919c;"><?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_PRM11_2')?></th>
-        </tr>
-        <?php
-        if(is_string($entity) && $entity && class_exists($entity) && method_exists($entity, 'getEntity')){
-            $fields = $entity::getMap();
-            /* @var $field \Bitrix\Main\ORM\Fields\Field */
-            foreach($fields as $field){
-                $fieldCode = $arField['NAME'].'[fields]['.$field->getName().']';
+        <?
+        if($controllerType){
+            $event = new Event(
+                "awz.bxorm",
+                "showField",
+                ['entity'=>$entity]
+            );
+            $event->send();
+            if ($event->getResults()) {
+                foreach ($event->getResults() as $evenResult) {
+                    if ($evenResult->getType() == EventResult::SUCCESS) {
+                        $r = $evenResult->getParameters();
+                        if(isset($r['func']) && is_array($r['func'])){
+                            call_user_func_array($r['func'], [$this, $arField]);
+                        }
+                    }
+                }
+            }
+            if(method_exists($entity, 'showBxOrmParams')){
+                $entity::showBxOrmParams();
+            }
+        }else{
+            ?>
+
+            <?php
+            if(is_string($entity) && $entity && class_exists($entity) && method_exists($entity, 'getEntity')){
                 ?>
+                <h2><?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_PRM11')?></h2>
+                <table>
                 <tr>
-                    <td <?=$r_style;?>>
-                        [<?=$field->getName()?>] - <?=$field->getTitle()?>
-                    </td>
-                    <td style="width:75%;padding:5px;border-bottom:1px solid #87919c;">
-                        <b><?=get_class($field)?></b><br><br>
-                        <?
-                        $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$field->getName()];
-                        $showDef = false;
-                        $checkResult = $this->checkCorrectField($field);
-                        if(!$checkResult->isSuccess()){
-                            ?>
-                            <p style="color:red;"><?=implode("<br>",$checkResult->getErrorMessages())?></p>
-                            <?
-                        }elseif($field->getParameter('primary')===true){
-                            $showDef = true;
-                            ?>
-                            <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
-                            <b>primary</b><br>
-                            <input type="hidden" name="<?=$fieldCode?>[type]" value="primary">
-                        <?}elseif($field instanceof Fields\StringField){
-                            $showDef = true;
-                            ?>
-                            <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
-                            <b>string</b><br>
-                            <input type="hidden" name="<?=$fieldCode?>[type]" value="string">
-                        <?}elseif($field instanceof Fields\IntegerField){
-                            $showDef = true;
-                            ?>
-                            <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
-                            <b>integer</b><br>
-                            <input type="hidden" name="<?=$fieldCode?>[type]" value="integer">
-                        <?}elseif($field instanceof Fields\FloatField){
-                            $showDef = true;
-                            ?>
-                            <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
-                            <b>float</b><br>
-                            <input type="hidden" name="<?=$fieldCode?>[type]" value="float">
-                        <?}elseif($field instanceof Fields\DateField){
-                            $showDef = true;
-                            ?>
-                            <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
-                            <b>date</b><br>
-                            <input type="hidden" name="<?=$fieldCode?>[type]" value="date">
-                        <?}elseif($field instanceof Fields\DateTimeField){
-                            $showDef = true;
-                            ?>
-                            <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
-                            <b>date</b><br>
-                            <input type="hidden" name="<?=$fieldCode?>[type]" value="datetime">
-                        <?}?>
-                        <?if($showDef){?>
-                            <?=$this->paramsFieldViewReadonly($field, $arField)?>
-                            <?=$this->paramsFieldViewActive($field, $arField)?><br>
-                            <?=$this->paramsFieldViewIsRequired($field, $arField)?>
-                            <?=$this->paramsFieldViewIsSortable($field, $arField)?>
-                            <br>
-                            <input style="margin-top:5px;" type="text" name="<?=$fieldCode?>[title]" value="<?=(!isset($fieldVal['title']) ? $field->getTitle() : $fieldVal['title'])?>">
-                        <?}?>
-                    </td>
+                    <th style="padding:5px;text-align:left;border-bottom:1px solid #87919c;border-right:1px solid #87919c;"><?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_PRM11_1')?></th>
+                    <th style="padding:5px;text-align:left;border-bottom:1px solid #87919c;"><?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_PRM11_2')?></th>
                 </tr>
                 <?php
+                $fields = $entity::getMap();
+                /* @var $field \Bitrix\Main\ORM\Fields\Field */
+                foreach($fields as $field){
+                    $fieldCode = $arField['NAME'].'[fields]['.$field->getName().']';
+                    ?>
+                    <tr>
+                        <td <?=$r_style;?>>
+                            [<?=$field->getName()?>] - <?=$field->getTitle()?>
+                        </td>
+                        <td style="width:75%;padding:5px;border-bottom:1px solid #87919c;">
+                            <b><?=get_class($field)?></b><br><br>
+                            <?
+                            $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$field->getName()];
+                            $showDef = false;
+                            $checkResult = $this->checkCorrectField($field);
+                            if(!$checkResult->isSuccess()){
+                                ?>
+                                <p style="color:red;"><?=implode("<br>",$checkResult->getErrorMessages())?></p>
+                                <?
+                            }elseif($field->getParameter('primary')===true){
+                                $showDef = true;
+                                ?>
+                                <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
+                                <b>primary</b><br>
+                                <input type="hidden" name="<?=$fieldCode?>[type]" value="primary">
+                            <?}elseif($field instanceof Fields\StringField){
+                                $showDef = true;
+                                ?>
+                                <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
+                                <b>string</b><br>
+                                <input type="hidden" name="<?=$fieldCode?>[type]" value="string">
+                            <?}elseif($field instanceof Fields\IntegerField){
+                                $showDef = true;
+                                ?>
+                                <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
+                                <b>integer</b><br>
+                                <input type="hidden" name="<?=$fieldCode?>[type]" value="integer">
+                            <?}elseif($field instanceof Fields\FloatField){
+                                $showDef = true;
+                                ?>
+                                <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
+                                <b>float</b><br>
+                                <input type="hidden" name="<?=$fieldCode?>[type]" value="float">
+                            <?}elseif($field instanceof Fields\DateField){
+                                $showDef = true;
+                                ?>
+                                <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
+                                <b>date</b><br>
+                                <input type="hidden" name="<?=$fieldCode?>[type]" value="date">
+                            <?}elseif($field instanceof Fields\DateTimeField){
+                                $showDef = true;
+                                ?>
+                                <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
+                                <b>date</b><br>
+                                <input type="hidden" name="<?=$fieldCode?>[type]" value="datetime">
+                            <?}?>
+                            <?if($showDef){?>
+                                <?=$this->paramsFieldViewReadonly($field, $arField)?>
+                                <?=$this->paramsFieldViewActive($field, $arField)?><br>
+                                <?=$this->paramsFieldViewIsRequired($field, $arField)?>
+                                <?=$this->paramsFieldViewIsSortable($field, $arField)?>
+                                <br>
+                                <input style="margin-top:5px;" type="text" name="<?=$fieldCode?>[title]" value="<?=(!isset($fieldVal['title']) ? $field->getTitle() : $fieldVal['title'])?>">
+                            <?}?>
+                        </td>
+                    </tr>
+                    <?php
+                }?>
+                </table>
+                <?
+                //echo'<pre>';print_r($fields);echo'</pre>';
+            }elseif(is_string($entity) && $entity){
+                if(!class_exists($entity)){
+                    ?><p style="color:red;"><?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_ERR3')?> [<?=$entity?>]</p><?
+                }else{
+                    ?><p style="color:red;"><?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_ERR4')?> [<?=$entity?>]</p><?
+                }
             }
-            //echo'<pre>';print_r($fields);echo'</pre>';
-        }elseif(is_string($entity) && $entity){
-            if(!class_exists($entity)){
-                ?><p style="color:red;"><?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_ERR3')?> [<?=$entity?>]</p><?
-            }else{
-                ?><p style="color:red;"><?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_ERR4')?> [<?=$entity?>]</p><?
-            }
+            ?><?
         }
-        ?></table><?
     }
 
     public static function getParams(): array

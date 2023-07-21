@@ -1,28 +1,39 @@
 <?php
 namespace Awz\BxOrm\Api\Controller;
 
+use Awz\BxOrm\Api\BinderResult;
 use Awz\BxOrm\Api\Scopes\Parameters;
 use Awz\BxOrm\Api\Scopes\Scope;
 use Awz\BxOrm\Api\Scopes\Controller;
 use Awz\BxOrm\Api\Filters\CheckMethod;
 use Awz\BxOrm\Api\Filters\AppAuth;
+use Awz\BxOrm\Api\Filters\NoCors;
 use Awz\BxOrm\HooksTable;
 use Awz\BxOrm\MethodsTable;
 use Awz\BxOrm\Helper;
+use Bitrix\Main\Engine\Action;
+use Bitrix\Main\Event;
+use Bitrix\Main\EventResult;
 use Bitrix\Main\Request;
 use Bitrix\Main\Error;
 use Bitrix\Main\Loader;
 use Bitrix\Main\Localization\Loc;
 use Bitrix\Main\Response;
+use Bitrix\Main\Result;
 use Bitrix\Main\Web\Json;
+use Awz\BxOrm\Api\Filters\Request\ReplaceFilter;
+use Bitrix\Main\Type\ParameterDictionary;
 
 Loc::loadMessages(__FILE__);
 
 class Hook extends Controller
 {
+    protected BinderResult $binderResult;
+
     public function __construct(Request $request = null)
     {
         parent::__construct($request);
+        $this->binderResult = new BinderResult();
     }
 
     public function configureActions()
@@ -30,6 +41,7 @@ class Hook extends Controller
         $config = [
             'methods' => [
                 'prefilters' => [
+                    new NoCors([],[]),
                     new AppAuth(
                         [], [],
                         Scope::createFromCode('user'),
@@ -39,6 +51,7 @@ class Hook extends Controller
             ],
             'batch' => [
                 'prefilters' => [
+                    new NoCors([],[]),
                     new AppAuth(
                         [], [],
                         Scope::createFromCode('user'),
@@ -48,6 +61,7 @@ class Hook extends Controller
             ],
             'call' => [
                 'prefilters' => [
+                    new NoCors([],[]),
                     //фильтр для проверки авторизации по app и key
                     new AppAuth(
                         [], [],
@@ -81,7 +95,7 @@ class Hook extends Controller
         return $config;
     }
 
-    public function add(string $entityClass, array $fieldsParams = [], array $fields = []){
+    public function add(string $entityClass, array $fieldsParams, array $fields = []){
         $primaryKey = '';
         foreach($fieldsParams as $fieldKey=>$fieldValue){
             if($fieldValue['isActive'] === 'Y' && $fieldValue['type']==='primary'){
@@ -113,22 +127,11 @@ class Hook extends Controller
             return null;
         }
         return [
-            'item'=>[$primaryKey=>$res->getId()]
+            'result'=>$res->getId()
         ];
     }
 
-    public function update(string $entityClass, array $fieldsParams = [], string $id, array $fields = []){
-        $primaryKey = '';
-        foreach($fieldsParams as $fieldKey=>$fieldValue){
-            if($fieldValue['isActive'] === 'Y' && $fieldValue['type']==='primary'){
-                $primaryKey = $fieldKey;
-            }
-        }
-        if(!$primaryKey){
-            $this->addError(new Error('primary key not active'));
-            return null;
-        }
-
+    public function update(string $entityClass, array $fieldsParams, array $primary, array $fields = []){
         $activeFields = [];
         foreach($fieldsParams as $fieldKey=>$fieldValue){
             if($fieldValue['isActive'] === 'Y' && $fieldValue['isReadOnly'] !== 'Y'){
@@ -143,8 +146,7 @@ class Hook extends Controller
             }
         }
 
-        $res = $entityClass::update([$primaryKey=>$id], $fieldsFin);
-        //print_r()
+        $res = $entityClass::update($primary, $fieldsFin);
         if(!$res->isSuccess()){
             foreach($res->getErrors() as $err){
                 $this->addError($err);
@@ -152,23 +154,33 @@ class Hook extends Controller
             return null;
         }
         return [
-            'item'=>[$primaryKey=>$id]
+            'result'=>true
+            //'item'=>$item,
+            //'updated'=>$checkChange
         ];
+
+        //$currentItem = $this->getList($entityClass, $fieldsParams,
+        //    ['filter'=>$primary, 'limit'=>1, 'count_total'=>false]
+        //);
+        //if(isset($currentItem['result']['items'][0])){
+        //    $item = $currentItem['result']['items'][0];
+            /*$checkChange = false;
+            foreach($fieldsFin as $k=>$v){
+                if(!isset($item[$k])) continue;
+                if($item[$k] != $v){
+                    $checkChange = true;
+                    break;
+                }
+            }*/
+        //}else{
+        //    $this->addError(new Error('element not found'));
+        //    return null;
+        //}
     }
 
-    public function delete(string $entityClass, array $fieldsParams = [], string $id){
-        $primaryKey = '';
-        foreach($fieldsParams as $fieldKey=>$fieldValue){
-            if($fieldValue['isActive'] === 'Y' && $fieldValue['type']==='primary'){
-                $primaryKey = $fieldKey;
-            }
-        }
-        if(!$primaryKey){
-            $this->addError(new Error('primary key not active'));
-            return null;
-        }
+    public function delete(string $entityClass, array $fieldsParams, array $primary){
         /* @var $entityClass \Bitrix\Main\ORM\Data\DataManager */
-        $res = $entityClass::delete([$primaryKey=>$id]);
+        $res = $entityClass::delete($primary);
         if(!$res->isSuccess()){
             foreach($res->getErrors() as $err){
                 $this->addError($err);
@@ -176,11 +188,11 @@ class Hook extends Controller
             return null;
         }
         return [
-            'item'=>[$primaryKey=>$id]
+            'result'=>true
         ];
     }
 
-    public function getList(string $entityClass, array $fieldsParams = [], array $params){
+    public function getList(string $entityClass, array $fieldsParams, array $params){
 
         $limit = 50;
         $offset = ceil($params['start']/$limit)*$limit;
@@ -221,17 +233,33 @@ class Hook extends Controller
             $query['filter'] = $params['filter'];
         }
 
-        $query['limit'] = $limit;
+        if(!isset($params['limit'])){
+            $query['limit'] = $limit;
+        }else{
+            $query['limit'] = $params['limit'];
+        }
         $query['offset'] = $offset;
-        $query['count_total'] = true;
+        if(!isset($params['count_total'])){
+            $query['count_total'] = true;
+        }else{
+            $query['count_total'] = ($params['count_total'] === true);
+        }
         $res = $entityClass::getList($query);
-        return [
+
+        $finData = [
             'result'=> [
                 'items'=>$res->fetchAll(),
             ],
-            'total'=>$res->getCount()
         ];
+        if($query['count_total']){
+            $finData['total'] = $res->getCount();
+            $next = $query['limit'] + $offset;
+            if($next<$finData['total']){
+                $finData['next'] = $next;
+            }
+        }
 
+        return $finData;
     }
 
     public function getFields(string $entityClass, array $fieldsParams = []){
@@ -295,16 +323,14 @@ class Hook extends Controller
             foreach($rowArQuery as $k=>$v){
                 $requestValues[$k] = $v;
             }
-            //$requestValues['key'] .= '1'; //тест кривого ключа
             $requestValues['action'] = 'awz:bxorm.api.hook.call';
             $controller->request = $startRequest;
-            //TODO replace to request->addFilter \Bitrix\Main\Type\IRequestFilter
-            $controller->request->set($requestValues);
+            $controller->request->addFilter(ReplaceFilter($requestValues));
             $result = $controller->run(
                 'call',
-                [new \Bitrix\Main\Type\ParameterDictionary($requestValues)]
+                [new ParameterDictionary($requestValues)]
             );
-            $actionsResult[$key] = $result;
+            $actionsResult[$key] = $result['result'];
             if($controller->getErrors()){
                 $actionsErrors[$key] = [];
                 foreach($controller->getErrors() as $err){
@@ -319,18 +345,128 @@ class Hook extends Controller
 
     }
 
-    public function callAction(int $app, string $method, array $order = [], array $select = [], array $filter = [], int $start = 0, string $id = "", array $fields = []){
+    public function getBinderResult(): BinderResult
+    {
+        return $this->binderResult;
+    }
+
+    public function callAction(int $app, string $method, array $order = [], array $select = [], array $filter = [], int $start = 0, string $id = "", array $fields = [], array $params = []){
+
+        $this->getBinderResult()
+            ->setApp($app)->setMethod($method)
+            ->setOrder($order)->setSelect($select)
+            ->setFilter($filter)->setStart($start)
+            ->setId($id)->setFields($fields)
+            ->setParams($params);
+
+        $event = new Event(
+            "awz.bxorm",
+            "onBeforeHookCallAction",
+            ['controller'=>$this]
+        );
+        $event->send();
+
+        $binderResult = $this->getBinderResult();
+        if(!$binderResult->isSuccess()){
+            $this->addErrors($binderResult->getErrors());
+            return null;
+        }
+        if(!empty($binderResult->getData())){
+            return $binderResult->getData();
+        }
+
+        $id = $binderResult->getId();
+        $method = $binderResult->getMethod();
+        $order = $binderResult->getOrder();
+        $select = $binderResult->getSelect();
+        $filter = $binderResult->getFilter();
+        $start = $binderResult->getStart();
+        $fields = $binderResult->getFields();
+        $params = $binderResult->getParams();
+
+        if(
+            isset($params['id']) || isset($params['method']) || isset($params['order']) ||
+            isset($params['select']) || isset($params['filter']) || isset($params['fields']) ||
+            isset($params['app']) || isset($params['params'])
+        )
+        {
+            $this->addError(new Error('illegal key in params parameter'));
+            $this->addError(new Error('disabled keys: id, method, order, select, filter, fields, app, params'));
+            return null;
+        }
+
+        $allParams = $this->getRequest()->getValues();
+        foreach($params as $c=>$v){
+            $allParams[$c] = $v;
+        }
 
         $METHOD_ID = $this->getScopeCollection()->getByCode('method')->getCustomData()->get('METHOD_ID');
 
         if(!$METHOD_ID){
-            $this->addError(new Error('Параметры метода не найдены'));
+            $this->addError(new Error(Loc::getMessage('AWZ_BXORM_API_CONTROLLER_HOOK_PARAM_M_ERR')));
             return null;
         }
 
         $methodsParams = MethodsTable::getRowById($METHOD_ID);
         if(!$methodsParams){
-            $this->addError(new Error('Параметры метода не найдены'));
+            $this->addError(new Error(Loc::getMessage('AWZ_BXORM_API_CONTROLLER_HOOK_PARAM_M_ERR')));
+            return null;
+        }
+
+        //подключение модулей
+        if(is_array($methodsParams['MODULES'])){
+            foreach($methodsParams['MODULES'] as $module){
+                if(!Loader::includeModule($module)){
+                    $this->addError(new Error($module.' - '.Loc::getMessage('AWZ_BXORM_API_CONTROLLER_HOOK_NOT_MODULE')));
+                    return null;
+                }
+            }
+        }
+
+        $cls = $methodsParams['ENTITY'];
+        //контроллер
+        if($cls && is_string($cls) && class_exists($cls) && method_exists($cls, 'listNameActions')){
+            $methodAr = explode('.',$method);
+            $controller = new $cls;
+            if($controller instanceof Controller && is_array($methodAr) &&
+                isset($methodAr[1]) && isset($methodAr[1]))
+            {
+                /* @var $controller Controller */
+
+                $actionName = $methodAr[1];
+                $result = $controller->run(
+                    $actionName,
+                    [new ParameterDictionary($allParams)]
+                );
+                $this->addErrors($controller->getErrors());
+                if($result){
+                    return ['result'=>$result];
+                }else{
+                    return null;
+                }
+            }elseif($controller instanceof \Bitrix\Main\Engine\Controller &&
+                is_array($methodAr) && isset($methodAr[1]) && isset($methodAr[1]))
+            {
+                /* @var $controller \Bitrix\Main\Engine\Controller */
+
+                $actionName = $methodAr[1];
+                $action = $controller->create($actionName);
+                $controller->setSourceParametersList([new ParameterDictionary($allParams)]);
+                $result = $action->runWithSourceParametersList();
+                $this->addErrors($action->getController()->getErrors());
+                if($result){
+                    return ['result'=>$result];
+                }else{
+                    return null;
+                }
+            }else{
+                $this->addError(new Error(Loc::getMessage('AWZ_BXORM_API_CONTROLLER_HOOK_M_FORMAT_ERR').' '.$method));
+                return null;
+            }
+        }
+        //не orm
+        if(!($cls && is_string($cls) && class_exists($cls) && method_exists($cls, 'getEntity'))){
+            $this->addError(new Error(Loc::getMessage('AWZ_BXORM_API_CONTROLLER_HOOK_PARAM_M_ERR')));
             return null;
         }
 
@@ -340,54 +476,86 @@ class Hook extends Controller
             $methodName = $methodAr[1];
             $appName = $methodAr[0];
 
-            //подключение модулей
-            if(is_array($methodsParams['MODULES'])){
-                foreach($methodsParams['MODULES'] as $module){
-                    if(!Loader::includeModule($module)){
-                        $this->addError(new Error($module.' - модуль не подключен'));
-                        return null;
-                    }
-                }
-            }
-
             $entityClass = $methodsParams['ENTITY'];
             if(!class_exists($entityClass)){
-                $this->addError(new Error($appName.' - классы метода не доступны'));
+                $this->addError(new Error($appName.' - '.Loc::getMessage('AWZ_BXORM_API_CONTROLLER_HOOK_CL_NOT_FOUND')));
                 return null;
             }
 
             if($methodName === 'fields'){
                 return $this->getFields($entityClass, $methodsParams['PARAMS']['fields']);
             }
-            if($methodName === 'delete'){
-                return $this->delete($entityClass, $methodsParams['PARAMS']['fields'], $id);
-            }
-            if($methodName === 'list'){
-                return $this->getList($entityClass, $methodsParams['PARAMS']['fields'],
-                    ['order'=>$order, 'select'=>$select, 'filter'=>$filter, 'start'=>$start]
-                );
-            }
-            if($methodName === 'update'){
-                return $this->update($entityClass, $methodsParams['PARAMS']['fields'], $id, $fields);
-            }
+
             if($methodName === 'add'){
                 return $this->add($entityClass, $methodsParams['PARAMS']['fields'], $fields);
             }
-            $this->addError(new Error('Запрещенный формат именования метода '.$method));
+
+            if($methodName === 'list'){
+                return $this->getList($entityClass, $methodsParams['PARAMS']['fields'],
+                    [
+                        'order'=>$order,
+                        'select'=>$select,
+                        'filter'=>$filter,
+                        'start'=>$start,
+                        'count_total'=>true
+                    ]
+                );
+            }
+
+            $primaryKey = 'ID';
+            if(in_array($methodName, ['delete', 'get', 'update'])){
+                if(!$id){
+                    $this->addError(new Error('id is required'));
+                    return null;
+                }
+                $primaryKey = '';
+                foreach($methodsParams['PARAMS']['fields'] as $fieldKey=>$fieldValue){
+                    if($fieldValue['isActive'] === 'Y' && $fieldValue['type']==='primary'){
+                        $primaryKey = $fieldKey;
+                    }
+                }
+                if(!$primaryKey){
+                    $this->addError(new Error('primary key not active'));
+                    return null;
+                }
+            }
+            if($methodName === 'delete'){
+                return $this->delete($entityClass, $methodsParams['PARAMS']['fields'], [$primaryKey=>$id]);
+            }
+            if($methodName === 'update'){
+                return $this->update($entityClass, $methodsParams['PARAMS']['fields'], [$primaryKey=>$id], $fields);
+            }
+            if($methodName === 'get'){
+                $result = $this->getList($entityClass, $methodsParams['PARAMS']['fields'],
+                    ['filter'=>['='.$primaryKey=>$id], 'limit'=>1, 'count_total'=>false]
+                );
+                if(isset($result['result']['items'][0])){
+                    return [
+                        'result'=> [
+                            'item'=>$result['result']['items'][0]
+                        ]
+                    ];
+                }else{
+                    return [
+                        'result'=> []
+                    ];
+                }
+            }
+
+            $this->addError(new Error(Loc::getMessage('AWZ_BXORM_API_CONTROLLER_HOOK_M_FORMAT_ERR').' '.$method));
             return null;
 
 
         }else{
-            $this->addError(new Error('Запрещенный формат именования метода '.$method));
+            $this->addError(new Error(Loc::getMessage('AWZ_BXORM_API_CONTROLLER_HOOK_M_FORMAT_ERR').' '.$method));
             return null;
         }
 
-        print_r($method);die();
     }
 
     public function methodsAction(int $app){
 
-        $methodNames = Helper::getOrmMethods(HooksTable::getEntity());
+        $methodNames = Helper::getMethods(HooksTable::getEntity());
 
         $hookData = HooksTable::getRowById($app);
         $methods = [];

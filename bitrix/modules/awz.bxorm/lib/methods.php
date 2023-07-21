@@ -74,8 +74,22 @@ class MethodsTable extends Entity\DataManager
             ),
             new Entity\StringField('PARAMS', array(
                     'required' => true,
-                    'serialized' => true,
-                    'title'=>Loc::getMessage('AWZ_BXORM_METHODS_ENTITY_FIELD_PARAMS')
+                    //'serialized' => true,
+                    'title'=>Loc::getMessage('AWZ_BXORM_METHODS_ENTITY_FIELD_PARAMS'),
+                    'save_data_modification' => function(){
+                        return [
+                            function ($value) {
+                                return serialize($value);
+                            }
+                        ];
+                    },
+                    'fetch_data_modification' => function(){
+                        return [
+                            function ($value) {
+                                return unserialize($value, ["allowed_classes" => false]);
+                            }
+                        ];
+                    },
                 )
             )
         );

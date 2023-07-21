@@ -60,8 +60,22 @@ class HooksTable extends Entity\DataManager
             ),
             new Entity\StringField('METHODS', array(
                     'required' => true,
-                    'serialized' => true,
-                    'title'=>Loc::getMessage('AWZ_BXORM_HOOKS_ENTITY_FIELD_METHODS')
+                    //'serialized' => true,
+                    'title'=>Loc::getMessage('AWZ_BXORM_HOOKS_ENTITY_FIELD_METHODS'),
+                    'save_data_modification' => function(){
+                        return [
+                            function ($value) {
+                                return serialize($value);
+                            }
+                        ];
+                    },
+                    'fetch_data_modification' => function(){
+                        return [
+                            function ($value) {
+                                return unserialize($value, ["allowed_classes" => false]);
+                            }
+                        ];
+                    },
                 )
             )
         );
