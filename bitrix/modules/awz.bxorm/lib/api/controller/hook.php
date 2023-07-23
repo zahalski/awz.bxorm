@@ -222,6 +222,19 @@ class Hook extends Controller
                 }
             }
         }
+        $selectFormat = [];
+        foreach($query['select'] as $k){
+            if(mb_strpos($k,'.')!==false){
+                $kvAr = explode('.',$k);
+                if(count($kvAr)<=3){
+                    $selectFormat[str_replace('.','___',$k)] = $k;
+                }
+            }else{
+                $selectFormat[$k] = $k;
+            }
+        }
+        $query['select'] = $selectFormat;
+
         $query['order'] = $defSort;
         if(isset($params['order']) && is_array($params['order'])){
             $keyOrder = array_keys($params['order']);
@@ -262,15 +275,8 @@ class Hook extends Controller
         return $finData;
     }
 
-    public function getFields(string $entityClass, array $fieldsParams = []){
-        $fieldsData = [];
-        $fields = $entityClass::getMap();
-        /* @var $field \Bitrix\Main\ORM\Fields\Field */
-        foreach($fields as $field){
-            //FIELD_PARAMS[fields][PARAMS][isActive]
-            if(!isset($fieldsParams[$field->getName()]['isActive'])) continue;
-            if($fieldsParams[$field->getName()]['isActive']!='Y') continue;
-            /*
+    public function getFieldsFormat($field, array $fieldsParams = [], $lv1 = null, $lv2 = null){
+        /*
              * [type] => string
              * [isRequired] => 1
              * [isReadOnly] =>
@@ -279,24 +285,109 @@ class Hook extends Controller
              * [isDynamic] =>
              * [title] => Имя
              * */
-            $noLink = false;
-            if($fieldsParams[$field->getName()]['type'] === 'primary'){
-                $fieldsParams[$field->getName()]['type'] = 'integer';
-                if($field instanceof \Bitrix\Main\ORM\Fields\StringField){
-                    $fieldsParams[$field->getName()]['type'] = 'string';
-                }
-                $noLink = true;
+
+        $fieldCode = $field->getName();
+        if($lv1){
+            $fieldCode = $lv1->getName().'.'.$field->getName();
+            if($lv2){
+                $fieldCode = $lv1->getName().'.'.$lv2->getName().'.'.$field->getName();
             }
-            $fieldsData[$field->getName()] = [
-                'type'=>$fieldsParams[$field->getName()]['type'],
-                'isRequired'=>$fieldsParams[$field->getName()]['isRequired'] == 'Y' ? 1 : 0,
-                'isReadOnly'=>$fieldsParams[$field->getName()]['isReadonly'] == 'Y' ? 1 : 0,
-                'sort'=>$fieldsParams[$field->getName()]['isSortable'] == 'Y' ? $field->getName() : '',
-                'title'=>$fieldsParams[$field->getName()]['title'],
-                'noLink'=>1
-            ];
-            if($noLink){
-                $fieldsData[$field->getName()]['noLink'] = 1;
+        }
+
+        $noLink = false;
+        if($fieldsParams[$fieldCode]['type'] === 'primary'){
+            $fieldsParams[$fieldCode]['type'] = 'integer';
+            if($field instanceof \Bitrix\Main\ORM\Fields\StringField){
+                $fieldsParams[$fieldCode]['type'] = 'string';
+            }
+            $noLink = true;
+        }
+        $fieldsData[$fieldCode] = [
+            'type'=>$fieldsParams[$fieldCode]['type'],
+            'isRequired'=>$fieldsParams[$fieldCode]['isRequired'] == 'Y' ? 1 : 0,
+            'isReadOnly'=>$fieldsParams[$fieldCode]['isReadonly'] == 'Y' ? 1 : 0,
+            'sort'=>$fieldsParams[$fieldCode]['isSortable'] == 'Y' ? $fieldCode : '',
+            'title'=>$fieldsParams[$fieldCode]['title'],
+            'noLink'=>1
+        ];
+        if($field instanceof \Bitrix\Main\ORM\Fields\EnumField){
+            $values = $field->getValues();
+            if(is_array($values)){
+                $valuesKeys = array_keys($values);
+                $newValues = [];
+                if(isset($valuesKeys[count($values)-1])){
+                    foreach($values as $v){
+                        $newValues[$v] = $v;
+                    }
+                    $values = $newValues;
+                }
+                $fieldsData[$fieldCode]['values'] = $values;
+            }
+        }
+        if($field instanceof \Bitrix\Main\ORM\Fields\BooleanField){
+            $values = $field->getValues();
+            if(is_array($values)){
+                $valuesKeys = array_keys($values);
+                $newValues = [];
+                if(isset($valuesKeys[count($values)-1])){
+                    foreach($values as $v){
+                        $langVal = Loc::getMessage('AWZ_BXORM_API_CONTROLLER_HOOK_BOOL_FIELD_'.$v);
+                        $newValues[$v] = $langVal ? $langVal : $v;
+                    }
+                    $values = $newValues;
+                }
+                $fieldsData[$fieldCode]['values'] = $values;
+            }
+        }
+        if($noLink){
+            $fieldsData[$fieldCode]['noLink'] = 1;
+        }
+        return $fieldsData[$fieldCode];
+    }
+    public function getFields(string $entityClass, array $fieldsParams = []){
+        $fieldsData = [];
+        $fields = $entityClass::getMap();
+        /* @var $field \Bitrix\Main\ORM\Fields\Field */
+        foreach($fields as $field){
+            //FIELD_PARAMS[fields][PARAMS][isActive]
+            if($field instanceof \Bitrix\Main\ORM\Fields\Relations\Reference){
+                if($field->getRefEntity()) {
+                    foreach ($field->getRefEntity()->getFields() as $rel1Field) {
+                        if($rel1Field instanceof \Bitrix\Main\ORM\Fields\Relations\Reference){
+                            if($rel1Field->getRefEntity()) {
+                                foreach ($rel1Field->getRefEntity()->getFields() as $rel2Field) {
+                                    if($rel2Field instanceof \Bitrix\Main\ORM\Fields\Relations\Reference){
+
+                                    }else{
+                                        $fieldCode = $field->getName().'.'.$rel1Field->getName().'.'.$rel2Field->getName();
+                                        if(!isset($fieldsParams[$fieldCode]['isActive'])) continue;
+                                        if($fieldsParams[$fieldCode]['isActive']!='Y') continue;
+                                        $formatedFields = $this->getFieldsFormat($rel2Field, $fieldsParams, $field, $rel1Field);
+                                        if($formatedFields && is_array($formatedFields)){
+                                            $fieldsData[$fieldCode] = $formatedFields;
+                                        }
+                                    }
+                                }
+                            }
+                        }else{
+                            $fieldCode = $field->getName().'.'.$rel1Field->getName();
+                            if(!isset($fieldsParams[$fieldCode]['isActive'])) continue;
+                            if($fieldsParams[$fieldCode]['isActive']!='Y') continue;
+                            $formatedFields = $this->getFieldsFormat($rel1Field, $fieldsParams, $field);
+                            if($formatedFields && is_array($formatedFields)){
+                                $fieldsData[$fieldCode] = $formatedFields;
+                            }
+                        }
+                    }
+                }
+            }else{
+                $fieldCode = $field->getName();
+                if(!isset($fieldsParams[$fieldCode]['isActive'])) continue;
+                if($fieldsParams[$fieldCode]['isActive']!='Y') continue;
+                $formatedFields = $this->getFieldsFormat($field, $fieldsParams);
+                if($formatedFields && is_array($formatedFields)){
+                    $fieldsData[$fieldCode] = $formatedFields;
+                }
             }
         }
         return [
@@ -325,7 +416,7 @@ class Hook extends Controller
             }
             $requestValues['action'] = 'awz:bxorm.api.hook.call';
             $controller->request = $startRequest;
-            $controller->request->addFilter(ReplaceFilter($requestValues));
+            $controller->request->addFilter(new ReplaceFilter($requestValues));
             $result = $controller->run(
                 'call',
                 [new ParameterDictionary($requestValues)]

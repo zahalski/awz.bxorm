@@ -30,6 +30,7 @@ class HooksTable extends Entity\DataManager
         PRIMARY KEY (`ID`)
         ) AUTO_INCREMENT=1;
         */
+        //ALTER TABLE `b_awz_bxorm_hooks` MODIFY `METHODS` longtext
     }
 
     public static function getMap()

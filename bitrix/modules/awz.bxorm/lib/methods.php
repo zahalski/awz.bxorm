@@ -33,6 +33,7 @@ class MethodsTable extends Entity\DataManager
         ) AUTO_INCREMENT=1;
         */
         //ALTER TABLE `b_awz_bxorm_methods` ADD `MODULES` varchar(1250) NOT NULL
+        //ALTER TABLE `b_awz_bxorm_methods` MODIFY `PARAMS` longtext;
     }
 
     public static function getMap()
@@ -79,6 +80,17 @@ class MethodsTable extends Entity\DataManager
                     'save_data_modification' => function(){
                         return [
                             function ($value) {
+
+                                if(isset($value['fields']) && is_array($value['fields'])){
+                                    $activeFields = [];
+                                    foreach($value['fields'] as $fieldCode=>$fieldVal){
+                                        if(isset($fieldVal['isActive']) && $fieldVal['isActive']==='Y'){
+                                            $activeFields[$fieldCode] = $fieldVal;
+                                        }
+                                    }
+                                    $value['fields'] = $activeFields;
+                                }
+
                                 return serialize($value);
                             }
                         ];

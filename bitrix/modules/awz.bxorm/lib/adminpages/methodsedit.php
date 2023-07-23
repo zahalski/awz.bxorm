@@ -105,45 +105,97 @@ class MethodsEdit extends IForm implements IParams {
         if($field instanceof Fields\FloatField){
             return $resultCheck;
         }
+        if($field instanceof Fields\EnumField){
+            return $resultCheck;
+        }
+        if($field instanceof Fields\ExpressionField){
+            $valueType = $field->getValueField();
+            if($valueType instanceof Fields\StringField){
+                return $resultCheck;
+            }
+            if($field->getParameter('data_type')==='string'){
+                return $resultCheck;
+            }
+        }
+        if($field instanceof Fields\BooleanField){
+            $values = $field->getValues();
+            if(is_array($values) && isset($values[0],$values[1]) && $values[0]=='N' && $values[1] == 'Y'){
+                return $resultCheck;
+            }else{
+                $resultCheck->addError(new Error(Loc::getMessage('AWZ_BXORM_METHODS_EDIT_ERR_YN')));
+                return $resultCheck;
+            }
+        }
         $resultCheck->addError(new Error(Loc::getMessage('AWZ_BXORM_METHODS_EDIT_ERR2')));
         return $resultCheck;
     }
-    public function paramsFieldViewIsRequired($field, $arField){
+    public function paramsFieldViewIsRequired($field, $arField, $lv1 = null, $lv2 = null){
         $fieldCode = $arField['NAME'].'[fields]['.$field->getName().']';
-        $value = $this->getFieldValue($arField['NAME'])['fields'][$field->getName()];
+        $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$field->getName()];
+        if($lv1){
+            $fieldCode = $arField['NAME'].'[fields]['.$lv1->getName().'.'.$field->getName().']';
+            $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$lv1->getName().'.'.$field->getName()];
+            if($lv2){
+                $fieldCode = $arField['NAME'].'[fields]['.$lv1->getName().'.'.$lv2->getName().'.'.$field->getName().']';
+                $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$lv1->getName().'.'.$lv2->getName().'.'.$field->getName()];
+            }
+        }
         $readOnly = false;
         if($field->getParameter('required')) {
-            if(!isset($value['isRequired'])){
-                $value['isRequired'] = ($field->getParameter('required')) ? "Y" : "N";
+            if(!isset($fieldVal['isRequired'])){
+                $fieldVal['isRequired'] = ($field->getParameter('required')) ? "Y" : "N";
             }
+        }
+        if($field->getParameter('primary')) $readOnly = true;
+        ?>
+        <?if($readOnly){?>
+            <input type="checkbox" name="<?=$fieldCode?>[isRequired_]" value="Y" checked="checked" disabled="disabled" readonly="readonly"> - <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_IS_REQ')?>
+            <input type="hidden" name="<?=$fieldCode?>[isRequired]" value="Y">
+        <?}else{?>
+            <input type="checkbox" name="<?=$fieldCode?>[isRequired]" value="Y"<?=($fieldVal['isRequired']=='Y' ? ' checked="checked"' : '')?>> - <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_IS_REQ')?>
+        <?}?>
+
+        <?php
+    }
+    public function paramsFieldViewReadonly($field, $arField, $lv1 = null, $lv2 = null){
+        $fieldCode = $arField['NAME'].'[fields]['.$field->getName().']';
+        $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$field->getName()];
+        if($lv1){
+            $fieldCode = $arField['NAME'].'[fields]['.$lv1->getName().'.'.$field->getName().']';
+            $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$lv1->getName().'.'.$field->getName()];
+            if($lv2){
+                $fieldCode = $arField['NAME'].'[fields]['.$lv1->getName().'.'.$lv2->getName().'.'.$field->getName().']';
+                $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$lv1->getName().'.'.$lv2->getName().'.'.$field->getName()];
+            }
+        }
+        $readOnly = false;
+        if($field->getParameter('isReadonly')) $readOnly = true;
+        if($field->getParameter('readonly')) $readOnly = true;
+        if($field->getParameter('primary')) $readOnly = true;
+        if($field instanceof Fields\ExpressionField){
+            $readOnly = true;
         }
         ?>
         <?if($readOnly){?>
-            <input type="checkbox" name="<?=$fieldCode?>[isRequired]" value="Y" checked="checked" disabled="disabled" readonly="readonly"> - <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_IS_REQ')?>
+            <input type="checkbox" name="<?=$fieldCode?>[isReadonly_]" value="Y" checked="checked" disabled="disabled" readonly="readonly"> - <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_ONLY_READ')?>
+            <input type="hidden" name="<?=$fieldCode?>[isReadonly]" value="Y">
         <?}else{?>
-            <input type="checkbox" name="<?=$fieldCode?>[isRequired]" value="Y"<?=($value['isRequired']=='Y' ? ' checked="checked"' : '')?>> - <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_IS_REQ')?>
+            <input type="checkbox" name="<?=$fieldCode?>[isReadonly]" value="Y"<?=($fieldVal['isReadonly']=='Y' ? ' checked="checked"' : '')?>> - <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_ONLY_READ')?>
         <?}?>
 
         <?php
     }
-    public function paramsFieldViewReadonly($field, $arField){
+    public function paramsFieldViewActive($field, $arField, $lv1 = null, $lv2 = null){
         $fieldCode = $arField['NAME'].'[fields]['.$field->getName().']';
-        $value = $this->getFieldValue($arField['NAME'])['fields'][$field->getName()];
-        $readOnly = false;
-        //if($field->getParameter('isReadonly')) $readOnly = true;
-        //if($field->getParameter('primary')) $readOnly = true;
-        ?>
-        <?if($readOnly){?>
-            <input type="checkbox" name="<?=$fieldCode?>[isReadonly]" value="Y" checked="checked" disabled="disabled" readonly="readonly"> - <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_ONLY_READ')?>
-        <?}else{?>
-            <input type="checkbox" name="<?=$fieldCode?>[isReadonly]" value="Y"<?=($value['isReadonly']=='Y' ? ' checked="checked"' : '')?>> - <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_ONLY_READ')?>
-        <?}?>
-
-        <?php
-    }
-    public function paramsFieldViewActive($field, $arField){
-        $fieldCode = $arField['NAME'].'[fields]['.$field->getName().']';
-        $value = $this->getFieldValue($arField['NAME'])['fields'][$field->getName()];
+        $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$field->getName()];
+        if($lv1){
+            $fieldCode = $arField['NAME'].'[fields]['.$lv1->getName().'.'.$field->getName().']';
+            $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$lv1->getName().'.'.$field->getName()];
+            if($lv2){
+                $fieldCode = $arField['NAME'].'[fields]['.$lv1->getName().'.'.$lv2->getName().'.'.$field->getName().']';
+                $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$lv1->getName().'.'.$lv2->getName().'.'.$field->getName()];
+            }
+        }
         $readOnly = false;
         //if($field->getParameter('private')) $readOnly = true;
         //if($field->getParameter('primary')) $readOnly = true;
@@ -151,14 +203,22 @@ class MethodsEdit extends IForm implements IParams {
         <?if($readOnly){?>
             <input type="checkbox" name="<?=$fieldCode?>[isActive]" value="Y" checked="checked" disabled="disabled" readonly="readonly"> - <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_ACTIVE_PRM')?>
         <?}else{?>
-            <input type="checkbox" name="<?=$fieldCode?>[isActive]" value="Y"<?=($value['isActive']=='Y' ? ' checked="checked"' : '')?>> - <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_ACTIVE_PRM')?>
+            <input type="checkbox" name="<?=$fieldCode?>[isActive]" value="Y"<?=($fieldVal['isActive']=='Y' ? ' checked="checked"' : '')?>> - <?if($fieldVal['isActive']=='Y'){?><span style="color:green;font-weight:bold;"><?}?><?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_ACTIVE_PRM')?><?if($fieldVal['isActive']=='Y'){?></span><?}?>
         <?}?>
 
         <?php
     }
-    public function paramsFieldViewIsSortable($field, $arField){
+    public function paramsFieldViewIsSortable($field, $arField, $lv1 = null, $lv2 = null){
         $fieldCode = $arField['NAME'].'[fields]['.$field->getName().']';
-        $value = $this->getFieldValue($arField['NAME'])['fields'][$field->getName()];
+        $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$field->getName()];
+        if($lv1){
+            $fieldCode = $arField['NAME'].'[fields]['.$lv1->getName().'.'.$field->getName().']';
+            $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$lv1->getName().'.'.$field->getName()];
+            if($lv2){
+                $fieldCode = $arField['NAME'].'[fields]['.$lv1->getName().'.'.$lv2->getName().'.'.$field->getName().']';
+                $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$lv1->getName().'.'.$lv2->getName().'.'.$field->getName()];
+            }
+        }
         $readOnly = false;
         //if($field->getParameter('private')) $readOnly = true;
         //if($field->getParameter('primary')) $readOnly = true;
@@ -166,11 +226,135 @@ class MethodsEdit extends IForm implements IParams {
         <?if($readOnly){?>
             <input type="checkbox" name="<?=$fieldCode?>[isSortable]" value="Y" checked="checked" disabled="disabled" readonly="readonly"> - <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_SORTABLE_PRM')?>
         <?}else{?>
-            <input type="checkbox" name="<?=$fieldCode?>[isSortable]" value="Y"<?=($value['isSortable']=='Y' ? ' checked="checked"' : '')?>> - <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_SORTABLE_PRM')?>
+            <input type="checkbox" name="<?=$fieldCode?>[isSortable]" value="Y"<?=($fieldVal['isSortable']=='Y' ? ' checked="checked"' : '')?>> - <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_SORTABLE_PRM')?>
         <?}?>
 
         <?php
     }
+
+    public static function getNumRow(){
+        static $numRow = 0;
+        $numRow++;
+        return $numRow;
+    }
+    public function printFieldParams($field, $arField, $lv1 = null, $lv2 = null){
+        $numRowCurrent = self::getNumRow();
+        if($numRowCurrent>1000 && $lv2){
+            return;
+        }
+        $r_style = 'style="width:25%;padding:5px;border-bottom:1px solid #87919c;border-right:1px solid #87919c;"';
+        $fieldCode = $arField['NAME'].'[fields]['.$field->getName().']';
+        $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$field->getName()];
+        if($lv1){
+            $fieldCode = $arField['NAME'].'[fields]['.$lv1->getName().'.'.$field->getName().']';
+            $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$lv1->getName().'.'.$field->getName()];
+            if($lv2){
+                $fieldCode = $arField['NAME'].'[fields]['.$lv1->getName().'.'.$lv2->getName().'.'.$field->getName().']';
+                $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$lv1->getName().'.'.$lv2->getName().'.'.$field->getName()];
+            }
+        }
+        ?>
+        <tr>
+            <td><?=$numRowCurrent;?></td>
+            <td <?=$r_style;?>>
+                <?if($lv1 && !$lv2){?>
+                    --1lv-- [<?=$lv1->getName().'.'.$field->getName()?>] - <?=$field->getTitle()?>
+                <?}elseif($lv1 && $lv2){?>
+                    --1lv-- --2lv-- [<?=$lv1->getName().'.'.$lv2->getName().'.'.$field->getName()?>] - <?=$field->getTitle()?>
+                <?}else{?>
+                    [<?=$field->getName()?>] - <?=$field->getTitle()?>
+                <?}?>
+            </td>
+            <td style="width:75%;padding:5px;border-bottom:1px solid #87919c;">
+                <b><?=get_class($field)?></b><br><br>
+                <?
+
+                $showDef = false;
+                $checkResult = $this->checkCorrectField($field);
+                if(!$checkResult->isSuccess()){
+                    ?>
+                    <p style="color:red;"><?=implode("<br>",$checkResult->getErrorMessages())?></p>
+                    <?
+                }elseif($field->getParameter('primary')===true){
+                    $showDef = true;
+                    ?>
+                    <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
+                    <b>primary</b><br>
+                    <input type="hidden" name="<?=$fieldCode?>[type]" value="primary">
+                <?}elseif($field instanceof Fields\StringField){
+                    $showDef = true;
+                    ?>
+                    <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
+                    <b>string</b><br>
+                    <input type="hidden" name="<?=$fieldCode?>[type]" value="string">
+                <?}elseif($field instanceof Fields\IntegerField){
+                    $showDef = true;
+                    ?>
+                    <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
+                    <b>integer</b><br>
+                    <input type="hidden" name="<?=$fieldCode?>[type]" value="integer">
+                <?}elseif($field instanceof Fields\FloatField){
+                    $showDef = true;
+                    ?>
+                    <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
+                    <b>float</b><br>
+                    <input type="hidden" name="<?=$fieldCode?>[type]" value="float">
+                <?}elseif($field instanceof Fields\DateField){
+                    $showDef = true;
+                    ?>
+                    <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
+                    <b>date</b><br>
+                    <input type="hidden" name="<?=$fieldCode?>[type]" value="date">
+                <?}elseif($field instanceof Fields\DateTimeField){
+                    $showDef = true;
+                    ?>
+                    <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
+                    <b>date</b><br>
+                    <input type="hidden" name="<?=$fieldCode?>[type]" value="datetime">
+                <?}elseif($field instanceof Fields\EnumField){
+                    $showDef = true;
+                    ?>
+                    <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
+                    <b>enum</b><br>
+                    <input type="hidden" name="<?=$fieldCode?>[type]" value="enum">
+                    <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_VALUES')?>:<br>
+                    <?foreach($field->getValues() as $codeVal=>$rowVal){?>
+                        <?=$codeVal?>: <?=$rowVal?>;
+                    <?}?><br>
+                <?}elseif($field instanceof Fields\BooleanField){
+                    $showDef = true;
+                    ?>
+                    <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
+                    <b>boolean</b><br>
+                    <input type="hidden" name="<?=$fieldCode?>[type]" value="boolean">
+                    <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_VALUES')?>:<br>
+                    <?foreach($field->getValues() as $codeVal=>$rowVal){?>
+                        <?=$codeVal?>: <?=$rowVal?>;
+                    <?}?><br>
+                <?}elseif($field instanceof Fields\ExpressionField){
+                    $showDef = true;
+                    ?>
+                    <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
+                    <b>string</b><br>
+                    <input type="hidden" name="<?=$fieldCode?>[type]" value="string">
+                <?}?>
+                <?if($showDef){?>
+                    <?=$this->paramsFieldViewReadonly($field, $arField, $lv1, $lv2)?>
+                    <?=$this->paramsFieldViewActive($field, $arField, $lv1, $lv2)?><br>
+                    <?=$this->paramsFieldViewIsRequired($field, $arField, $lv1, $lv2)?>
+                    <?=$this->paramsFieldViewIsSortable($field, $arField, $lv1, $lv2)?>
+                    <br>
+                    <?
+                    //$fieldVal
+                    $fileTitleDef = $field->getTitle() ? $field->getTitle() : $field->getName();
+                    ?>
+                    <input style="margin-top:5px;" type="text" name="<?=$fieldCode?>[title]" value="<?=$fieldVal['title'] ? $fieldVal['title'] : $fileTitleDef?>">
+                <?}?>
+            </td>
+        </tr>
+        <?php
+    }
+
     public function paramsFieldView($arField){
         $r_style = 'style="width:25%;padding:5px;border-bottom:1px solid #87919c;border-right:1px solid #87919c;"';
         $valueField = $this->getFieldValue($arField['NAME']);
@@ -265,6 +449,7 @@ class MethodsEdit extends IForm implements IParams {
                 <h2><?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_PRM11')?></h2>
                 <table>
                 <tr>
+                    <th style="padding:5px;text-align:left;border-bottom:1px solid #87919c;border-right:1px solid #87919c;">№</th>
                     <th style="padding:5px;text-align:left;border-bottom:1px solid #87919c;border-right:1px solid #87919c;"><?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_PRM11_1')?></th>
                     <th style="padding:5px;text-align:left;border-bottom:1px solid #87919c;"><?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_PRM11_2')?></th>
                 </tr>
@@ -272,70 +457,25 @@ class MethodsEdit extends IForm implements IParams {
                 $fields = $entity::getMap();
                 /* @var $field \Bitrix\Main\ORM\Fields\Field */
                 foreach($fields as $field){
-                    $fieldCode = $arField['NAME'].'[fields]['.$field->getName().']';
-                    ?>
-                    <tr>
-                        <td <?=$r_style;?>>
-                            [<?=$field->getName()?>] - <?=$field->getTitle()?>
-                        </td>
-                        <td style="width:75%;padding:5px;border-bottom:1px solid #87919c;">
-                            <b><?=get_class($field)?></b><br><br>
-                            <?
-                            $fieldVal = $this->getFieldValue($arField['NAME'])['fields'][$field->getName()];
-                            $showDef = false;
-                            $checkResult = $this->checkCorrectField($field);
-                            if(!$checkResult->isSuccess()){
-                                ?>
-                                <p style="color:red;"><?=implode("<br>",$checkResult->getErrorMessages())?></p>
-                                <?
-                            }elseif($field->getParameter('primary')===true){
-                                $showDef = true;
-                                ?>
-                                <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
-                                <b>primary</b><br>
-                                <input type="hidden" name="<?=$fieldCode?>[type]" value="primary">
-                            <?}elseif($field instanceof Fields\StringField){
-                                $showDef = true;
-                                ?>
-                                <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
-                                <b>string</b><br>
-                                <input type="hidden" name="<?=$fieldCode?>[type]" value="string">
-                            <?}elseif($field instanceof Fields\IntegerField){
-                                $showDef = true;
-                                ?>
-                                <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
-                                <b>integer</b><br>
-                                <input type="hidden" name="<?=$fieldCode?>[type]" value="integer">
-                            <?}elseif($field instanceof Fields\FloatField){
-                                $showDef = true;
-                                ?>
-                                <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
-                                <b>float</b><br>
-                                <input type="hidden" name="<?=$fieldCode?>[type]" value="float">
-                            <?}elseif($field instanceof Fields\DateField){
-                                $showDef = true;
-                                ?>
-                                <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
-                                <b>date</b><br>
-                                <input type="hidden" name="<?=$fieldCode?>[type]" value="date">
-                            <?}elseif($field instanceof Fields\DateTimeField){
-                                $showDef = true;
-                                ?>
-                                <?=Loc::getMessage('AWZ_BXORM_METHODS_EDIT_FIELDS_TYPE')?>:
-                                <b>date</b><br>
-                                <input type="hidden" name="<?=$fieldCode?>[type]" value="datetime">
-                            <?}?>
-                            <?if($showDef){?>
-                                <?=$this->paramsFieldViewReadonly($field, $arField)?>
-                                <?=$this->paramsFieldViewActive($field, $arField)?><br>
-                                <?=$this->paramsFieldViewIsRequired($field, $arField)?>
-                                <?=$this->paramsFieldViewIsSortable($field, $arField)?>
-                                <br>
-                                <input style="margin-top:5px;" type="text" name="<?=$fieldCode?>[title]" value="<?=(!isset($fieldVal['title']) ? $field->getTitle() : $fieldVal['title'])?>">
-                            <?}?>
-                        </td>
-                    </tr>
-                    <?php
+                    if($field instanceof Fields\Relations\Reference){
+                        if($field->getRefEntity()) {
+                            foreach ($field->getRefEntity()->getFields() as $rel1Field) {
+                                if($rel1Field instanceof Fields\Relations\Reference){
+                                    if($rel1Field->getRefEntity()) {
+                                        foreach ($rel1Field->getRefEntity()->getFields() as $rel2Field) {
+                                            $rel2Field->setParameter('readonly', true);
+                                            $this->printFieldParams($rel2Field, $arField, $field, $rel1Field);
+                                        }
+                                    }
+                                }else{
+                                    $rel1Field->setParameter('readonly', true);
+                                    $this->printFieldParams($rel1Field, $arField, $field);
+                                }
+                            }
+                        }
+                    }else{
+                        $this->printFieldParams($field, $arField);
+                    }
                 }?>
                 </table>
                 <?
