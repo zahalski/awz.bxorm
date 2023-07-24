@@ -99,7 +99,9 @@ class Hook extends Controller
         $primaryKey = '';
         foreach($fieldsParams as $fieldKey=>$fieldValue){
             if($fieldValue['isActive'] === 'Y' && $fieldValue['type']==='primary'){
+                if(mb_strpos($fieldKey, '.')!==false) continue;
                 $primaryKey = $fieldKey;
+                break;
             }
         }
         if(!$primaryKey){
@@ -135,6 +137,7 @@ class Hook extends Controller
         $activeFields = [];
         foreach($fieldsParams as $fieldKey=>$fieldValue){
             if($fieldValue['isActive'] === 'Y' && $fieldValue['isReadOnly'] !== 'Y'){
+                if(mb_strpos($fieldKey, '.')!==false) continue;
                 $activeFields[] = $fieldKey;
             }
         }
@@ -602,7 +605,9 @@ class Hook extends Controller
                 $primaryKey = '';
                 foreach($methodsParams['PARAMS']['fields'] as $fieldKey=>$fieldValue){
                     if($fieldValue['isActive'] === 'Y' && $fieldValue['type']==='primary'){
+                        if(mb_strpos($fieldKey, '.')!==false) continue;
                         $primaryKey = $fieldKey;
+                        break;
                     }
                 }
                 if(!$primaryKey){
