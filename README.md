@@ -128,3 +128,9 @@ class handlersAwz {
 //{"status":"success","data":{"result":{"item":{"ID":1,"NAME":"Default"}}},"errors":[]}
 ```
 
+<!-- cl-start -->
+## История версий
+
+https://github.com/zahalski/awz.bxorm/blob/master/CHANGELOG.md
+
+<!-- cl-end -->
