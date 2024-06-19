@@ -73,6 +73,14 @@ class AppAuth extends BaseFilter {
             ));
             return new EventResult(EventResult::ERROR, null, 'awz.bxorm', $this);
         }
+		
+		if(strpos($key, '|')!==false){
+            $userAr = explode('|',$key);
+            if(count($userAr)==2){
+                global $USER;
+                $USER->Authorize($userAr[0]);
+            }
+        }
 
         $this->enableScope();
 
