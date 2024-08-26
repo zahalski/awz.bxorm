@@ -533,7 +533,9 @@ class Hook extends Controller
                     [new ParameterDictionary($allParams)]
                 );
                 $this->addErrors($controller->getErrors());
-                if($result){
+                if($result instanceof \Bitrix\Main\HttpResponse){
+                    return $result;
+                }elseif($result){
                     return ['result'=>$result];
                 }else{
                     return null;
@@ -548,7 +550,9 @@ class Hook extends Controller
                 $controller->setSourceParametersList([new ParameterDictionary($allParams)]);
                 $result = $action->runWithSourceParametersList();
                 $this->addErrors($action->getController()->getErrors());
-                if($result){
+                if($result instanceof \Bitrix\Main\HttpResponse){
+                    return $result;
+                }elseif($result){
                     return ['result'=>$result];
                 }else{
                     return null;
